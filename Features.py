@@ -1,0 +1,401 @@
+import re   
+from tldextract import extract
+import ssl
+import socket
+from bs4 import BeautifulSoup
+import urllib.request
+import whois
+import datetime
+import favicon
+import os
+from requests import get
+
+def url_having_ip(url):
+    symbol = re.findall(r'(http((s)?)://)((((\d)+).)*)((\w)+)(/((\w)+))?',url)
+    if(len(symbol)!=0):
+        return 1
+    else:
+        return -1
+
+def url_length(url):
+    length=len(url)
+    if(length<54):
+        return -1
+    elif(54<=length<=75):
+        return 0
+    else:
+        return 1
+
+def url_short(url):
+    subDomain, domain, suffix = extract(url)
+    if (len(domain) < 3):
+        return 1
+    else:
+        return -1
+
+def having_at_symbol(url):
+    symbol=re.findall(r'@',url)
+    if(len(symbol)==0):
+        return -1
+    else:
+        return 1 
+
+def doubleSlash(url):
+    value = url.find("//")
+    if (value > 7):
+        return 1
+    else:
+        return -1
+
+def prefix_suffix(url):
+    subDomain, domain, suffix = extract(url)
+    if(domain.count('-')):
+        return 1
+    else:
+        return -1
+
+def sub_domain(url):
+    subDomain, domain, suffix = extract(url)
+    if(subDomain.count('.') == 0):
+        return -1
+    elif(subDomain.count('.') == 1):
+        return 0
+    else:
+        return 1
+
+def SSLfinal_State(url):
+    try:      
+        if(re.search('^https',url)):
+            usehttps = 1
+        else:
+            usehttps = 0
+        subDomain, domain, suffix = extract(url)
+        host_name = domain + "." + suffix
+        context = ssl.create_default_context()
+        sct = context.wrap_socket(socket.socket(), server_hostname = host_name)
+        sct.connect((host_name, 443))
+        certificate = sct.getpeercert()
+        issuer = dict(x[0] for x in certificate['issuer'])
+        certificate_Auth = str(issuer['commonName'])
+        certificate_Auth = certificate_Auth.split()
+        if(certificate_Auth[0] == "Network" or certificate_Auth == "Deutsche"):
+            certificate_Auth = certificate_Auth[0] + " " + certificate_Auth[1]
+        else:
+            certificate_Auth = certificate_Auth[0] 
+        trusted_Auth = ['Comodo','Symantec','GoDaddy','GlobalSign','DigiCert','StartCom','Entrust','Verizon','Trustwave',
+                        'Unizeto','Buypass','QuoVadis','Deutsche Telekom','Network Solutions','SwissSign','IdenTrust','Secom',
+                        'TWCA','GeoTrust','Thawte','Doster','VeriSign', 'GTS']
+        
+        fine = True
+        try:
+            certificate['crlDistributionPoints']
+        except KeyError:
+            fine = False
+
+        if((usehttps==1) and (certificate_Auth in trusted_Auth) and fine):
+            return -1
+        elif((usehttps==1) and (certificate_Auth not in trusted_Auth)):
+            return 0
+        else:
+            return 1
+        
+    except:
+        
+        return 1
+
+def domain_registration(url):
+    try:
+        w = whois.whois(url)
+        updated = w.updated_date
+        exp = w.expiration_date
+        age = (exp[0]-updated[0]).days
+        if(age <= 365):
+            return 1
+        else:
+            return -1
+    except:
+        return 0
+
+def Favicon(url):
+    try:
+        icons = favicon.get(url)
+        if(icons[0][1] == 0 or icons[0][2] == 0):
+            return 1
+        else:
+            return -1
+    except:
+        return 0
+
+def port(url):
+    subDomain, domain, suffix = extract(url)
+    host_name = domain + "." + suffix
+    command = 'ping ' + host_name
+    process = os.popen(command)
+    results = str(process.read())
+    if (results.split()[2] == 'could'):
+        return 1
+    else:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        target = results.split()[2][1:-1]
+        for i in [21,22,23,445,1433,1521,3306,3389]:
+            try:
+                con = s.connect((target,i))
+                return 1
+            except:
+                continue
+        return -1
+
+def https_token(url):
+    subDomain, domain, suffix = extract(url)
+    host = subDomain +'.' + domain + '.' + suffix 
+    if(host.count('https')): #attacker can trick by putting https in domain part
+        return 1
+    else:
+        return -1
+
+def request_url(url):
+    try:
+        subDomain, domain, suffix = extract(url)
+        websiteDomain = domain
+        
+        opener = urllib.request.urlopen(url).read()
+        soup = BeautifulSoup(opener, 'lxml')
+        imgs = soup.findAll('img', src=True)
+        total = len(imgs)
+        
+        linked_to_same = 0
+        avg =0
+        for image in imgs:
+            subDomain, domain, suffix = extract(image['src'])
+            imageDomain = domain
+            if(websiteDomain==imageDomain or imageDomain==''):
+                linked_to_same = linked_to_same + 1
+        vids = soup.findAll('video', src=True)
+        total = total + len(vids)
+        
+        for video in vids:
+            subDomain, domain, suffix = extract(video['src'])
+            vidDomain = domain
+            if(websiteDomain==vidDomain or vidDomain==''):
+                linked_to_same = linked_to_same + 1
+        linked_outside = total-linked_to_same
+        if(total!=0):
+            avg = linked_outside/total
+            
+        if(avg<0.22):
+            return -1
+        elif(0.22<=avg<=0.61):
+            return 0
+        else:
+            return 1
+    except:
+        return 0
+
+def url_of_anchor(url):
+    try:
+        subDomain, domain, suffix = extract(url)
+        websiteDomain = domain
+        
+        opener = urllib.request.urlopen(url).read()
+        soup = BeautifulSoup(opener, 'lxml')
+        anchors = soup.findAll('a', href=True)
+        total = len(anchors)
+        linked_to_same = 0
+        avg = 0
+        for anchor in anchors:
+            subDomain, domain, suffix = extract(anchor['href'])
+            anchorDomain = domain
+            if(websiteDomain == anchorDomain or anchorDomain == ''):
+                linked_to_same += 1
+        linked_outside = total - linked_to_same
+        if(total!=0):
+            avg = linked_outside/total
+            
+        if(avg<0.31):
+            return -1
+        elif(0.31 <= avg <= 0.67):
+            return 0
+        else:
+            return 1
+    except:
+        return 0
+    
+def Links_in_tags(url):
+    try:
+        opener = urllib.request.urlopen(url).read()
+        soup = BeautifulSoup(opener, 'lxml')
+        
+        no_of_meta = 0
+        no_of_link = 0
+        no_of_script = 0
+        avg = 0
+        total_link = 0
+        for meta in soup.find_all('meta'):
+            no_of_meta += 1
+            if (meta.get('href')):
+                total_link += 1
+        for link in soup.find_all('link'):
+            no_of_link += 1
+            if (link.get('href')):
+                total_link += 1
+        for script in soup.find_all('script'):
+            no_of_script += 1
+            if (script.get('href')):
+                total_link += 1
+            
+        total = no_of_meta + no_of_link + no_of_script
+        if(total != 0):
+            avg = total_link/total
+
+        if(avg < 0.17):
+            return -1
+        elif(0.17 <= avg <= 0.81):
+            return 0
+        else:
+            return 1        
+    except:        
+        return 0
+
+def sfh(url):
+    subDomain, maindomain, suffix = extract(url)
+    opener = urllib.request.urlopen(url).read()
+    soup = BeautifulSoup(opener, 'lxml')
+    for form in soup.find_all('form'):
+        try:
+            subDomain, domain, suffix = extract(form.get("action"))
+            if maindomain == domain:
+                return -1
+            else:
+                return 0
+        except:
+            return 0
+    return 1
+
+def email_submit(url):
+    try:
+        opener = urllib.request.urlopen(url).read()
+        soup = BeautifulSoup(opener, 'lxml')
+        for m in soup.find_all('a', href = True):
+            if ('mailto:' in m.get('href')):
+                return 1
+            else:
+                return -1
+    except:
+        return 0
+
+def abnormal_url(url):
+    try:
+        w = whois.whois(url)
+        if (w.domain == 'None'):
+            return 1
+        else:
+            return -1
+    except:
+        return 1
+    
+def redirect(url):
+    redir = 0
+    opener = get(url)
+    soup = BeautifulSoup(opener.text, 'lxml')
+    for tags in soup.find_all('script'):
+        if "window.location" in str(tags):
+            redir += 1
+    for tags in soup.find_all('meta'):
+        if "URL" in str(tags):
+            redir += 1
+    if (redir <= 1):
+        return -1
+    elif (redir < 4):
+        return 0
+    else:
+        return 1
+
+def on_mouseover(url):
+    opener = get(url)
+    soup = BeautifulSoup(opener.text, 'lxml')
+    if "onMouseOut=\"window.status=" or "onmouseout=\"window.status=" in str(soup):
+        return 1
+    else:
+        return -1
+
+def rightClick(url):
+    #ongoing
+    return 0
+
+def popup(url):
+    opener = get(url)
+    soup = BeautifulSoup(opener.text, 'lxml')
+    for script in soup.find_all("script"):
+        if "window.open" or "alert" in str(script):
+            return 1
+        else:
+            return -1
+    return 1
+
+def iframe(url):
+    opener = get(url)
+    soup = BeautifulSoup(opener.text, 'lxml')
+    iframe = soup.find_all("iframe")
+    if iframe == None:
+        return -1
+    else:
+        return 1
+
+def age_of_domain(url):
+    try:
+        w = whois.whois(url)
+        start_date = w.creation_date
+        current_date = datetime.datetime.now()
+        try:
+            age = (current_date - start_date[0]).days
+        except:
+            return 1
+        if(age <= 180):
+            return 1
+        else:
+            return -1
+    except:
+        return 0
+        
+def dns(url):
+    try:
+        w = whois.whois(url)
+        if (w.dnssec == None):
+            return 1
+        else:
+            return -1
+    except:
+        return 1
+
+def web_traffic(url):
+    ##Need API
+    return 0
+
+def page_rank(url):
+    ##Need API
+    return 0
+
+def google_index(url):
+    ##Need API
+    return 0
+
+def links_pointing(url):
+    ##Need API
+    return 0
+
+def statistical(url):
+    ##Need API
+    return 0
+
+def main(url):
+    check = [[url_having_ip(url),url_length(url),url_short(url),having_at_symbol(url),
+             doubleSlash(url),prefix_suffix(url),sub_domain(url),SSLfinal_State(url),
+              domain_registration(url),Favicon(url),port(url),https_token(url),request_url(url),
+              url_of_anchor(url),Links_in_tags(url),sfh(url),email_submit(url),abnormal_url(url),
+              redirect(url),on_mouseover(url),rightClick(url),popup(url),iframe(url),
+              age_of_domain(url),dns(url),web_traffic(url),page_rank(url),google_index(url),
+              links_pointing(url),statistical(url)]]
+    
+    return check
+
+
