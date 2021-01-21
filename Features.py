@@ -368,23 +368,23 @@ def dns(url):
         return 1
 
 def web_traffic(url):
-    ##Need API
+    ##on-going
     return 0
 
 def page_rank(url):
-    ##Need API
+    ##on-going
     return 0
 
 def google_index(url):
-    ##Need API
+    ##on-going
     return 0
 
 def links_pointing(url):
-    ##Need API
+    ##on-going
     return 0
 
 def statistical(url):
-    ##Need API
+    ##on-going
     return 0
 
 def main(url):
