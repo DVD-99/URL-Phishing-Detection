@@ -2,7 +2,7 @@
 """
 Created on Tue May 12 23:51:55 2020
 
-@author: Mohan Kancherla, Vishnu Dutt Duggirala, Vijay Krishna Lanka
+@author: DVD
 
 """
 
@@ -51,56 +51,46 @@ for k in X_test_scaled:
         
 conf_matrix = confusion_matrix(Y_actual, Y_prediction)
 accuracy = accuracy_score(Y_actual, Y_prediction)
-
 Accuracy_KNN = accuracy
 
-print(accuracy)
+print("KNN_Accuracy:", accuracy)
 
 # Naive Bayes Implementation
 
 from sklearn.naive_bayes import GaussianNB
 
 gnb = GaussianNB()
-
 gnb.fit(X_train, Y_train)
-
 y_pred = gnb.predict(X_test)
-
 Accuracy_NaiveBayes = accuracy_score(Y_test, y_pred)
-
-print("Accuracy:", accuracy_score(Y_test, y_pred))
+print("Naive_Accuracy:", accuracy_score(Y_test, y_pred))
 
 # Decision Tree
 
 from sklearn.tree import DecisionTreeClassifier 
 
 clf = DecisionTreeClassifier()
-
 # Train Decision Tree Classifer
 clf = clf.fit(X_train,Y_train)
-
 #Predict the response for test dataset
 y_pred = clf.predict(X_test)
-
 Accuracy_DT = accuracy_score(Y_test, y_pred)
-
-print("Accuracy:", accuracy_score(Y_test, y_pred))
+print("Tree_Accuracy:", accuracy_score(Y_test, y_pred))
 
 # SVM
 
 from sklearn.svm import SVC
 
 svclassifier = SVC(kernel='linear')
-
 svclassifier.fit(X_train,Y_train)
-
 y_pred = svclassifier.predict(X_test)
-
 Accuracy_SVM = accuracy_score(Y_test, y_pred)
+print("SVM_Accuracy:", accuracy_score(Y_test, y_pred))
 
 # Graphs plot
 
 import matplotlib.pyplot as plt
+
 fig = plt.figure()
 ax = fig.add_axes([0,0,1,1])
 Methods = ['KNN', 'Naive Bayes', 'Decision Tree','SVM']
